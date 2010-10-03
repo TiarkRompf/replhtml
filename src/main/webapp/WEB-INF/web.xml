@@ -1,0 +1,21 @@
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+         version="2.5">
+    <servlet>
+        <servlet-name>Repl</servlet-name>
+        <servlet-class>ch.epfl.lamp.replhtml.ReplServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>Repl</servlet-name>
+        <url-pattern>/socket/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>default</servlet-name>
+        <url-pattern>/images/*</url-pattern>
+        <url-pattern>/css/*</url-pattern>
+        <url-pattern>/js/*</url-pattern>
+    </servlet-mapping>
+</web-app>

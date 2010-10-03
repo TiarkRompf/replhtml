@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html manifest="webapp.manifest">
+<head>
+<meta charset="utf-8">
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<style type="text/css">
+body {
+  font-family: sans-serif;
+}
+.input {
+  margin-left: 8ex;
+}
+.output {
+}
+.runIn {
+  float: left;
+  font-family: monospace;
+}
+.runIn .buttons {
+  color: white;
+  position: relative;
+  top: 2ex;
+  cursor: pointer;
+  display: block;
+}
+.runIn .buttons:hover {
+  color: gray;
+}
+.runIn .buttons.shown {
+  color: gray;
+}
+.runIn .prompt {
+  position: absolute;
+  left: 1ex;
+}
+.completions {
+  position: absolute;
+  left: 400px;
+  width: 300px;
+  color: gray;
+  background-color: white;
+  -webkit-column-width: 15ex;
+}
+#globalCompletions {
+  color: gray;
+  -webkit-column-width: 15ex;
+  font-family: monospace;
+}
+/*
+.completions {
+  position: absolute;
+  width: 90%;
+  color: gray;
+  background-color: white;
+  -webkit-column-width: 15ex;
+}
+*/
+@-webkit-keyframes bounce {
+  from {
+   background-color: white;
+  }
+  to {
+   background-color: yellow;
+  }
+}
+#status {
+  width: 1em;
+  height: 1em;
+  -webkit-border-radius: 1em;
+  display: inline-block;
+}
+#status.off {
+  background-color: gray;
+}
+#status.zero {
+  -webkit-animation-name: bounce;
+  -webkit-animation-duration: 2s;
+  -webkit-animation-iteration-count: 10;
+  -webkit-animation-direction: alternate;
+  background-color: yellow;
+}
+#status.one {
+  background-color: green;
+}
+#status.two {
+  background-color: red;
+}
+#fileSys {
+  float: right;
+  border: 1px solid gray;
+  padding: 4px;
+}
+#fileSysShowHide {
+  text-align: right;
+  cursor: pointer;
+}
+#newFileName {
+  border: 1px solid gray;
+}
+</style>
+<script type="text/javascript">
+$(document).ready(function() {  
+  
+  if(!("WebSocket" in window)) {
+    // we're out of business...
+    $('.container').children().remove()
+    $('.container').append($('<p>WebSockets unavailable.<p>'))
+  } else {
+  
+      // ------------ config
+      
+      var host = "/socket/repl";
+      if (window.location.protocol == "http:")
+        host = "ws://" + window.location.host + host
+      else
+        host = "ws://localhost:8080" + host
+        
+
+      var settings = {
+        editMultiLineDefault: false,
+        inputDefault: '',
+        showSessions: false,
+        showCompletions: false
+      }
+  
+      // ------------ globals
+
+      var currentlyEvaluating = []
+      var completionTimer;
+      var socket;  
+
+      function message(msg) {
+        $('#msgLog').text(msg);
+      }
+      
+      // ------------ send / receive
+
+      function connect() {
+          try {
+              socket = new WebSocket(host);
+              message('Socket Status: '+socket.readyState);
+              $('#status').removeClass('off zero one two').addClass('zero')
+              socket.onopen = function() {
+                 message('Socket Status: '+socket.readyState+' (open)');  
+                 $('#status').removeClass('off zero one two').addClass('one')
+              }
+              socket.onmessage = function(msg) {
+//                 receivedReply(msg.data+'\n\r') // not sure that's the right thing to do...
+                 receivedReply(msg.data) // not sure that's the right thing to do...
+              }
+              socket.onclose = function() {
+                message('Socket Status: '+socket.readyState+' (Closed)');
+                $('#status').removeClass('off zero one two').addClass('two')
+              }           
+          } catch(ex) {  
+             message('Error'+ex)
+          }  
+      }
+
+      // ------------ send / receive
+      
+      
+      function submitExecBox(box) {
+        var empty = currentlyEvaluating.length == 0
+        currentlyEvaluating.push(box)
+        if (empty) send(box, "run")
+      }
+      
+      function doExecNext() {
+        if (currentlyEvaluating.length) {
+          var box = currentlyEvaluating[0]
+          send(box, "run")
+        }
+      }
+      
+      function send(boxElem,mode) {
+        var inElem = $('.input', boxElem)
+        var outElem = $('.output', boxElem)
+
+        var text = inElem.text()
+        if (text == "" && mode == "run") {  // TODO: should do somewhere else
+          if (currentlyEvaluating.length && currentlyEvaluating[0] == boxElem)
+            currentlyEvaluating.shift()
+            return
+        }
+        outElem.addClass('overwrite')
+        //$('#replLog').append('scala> '+text+'\n')
+
+        try {
+          socket.send(mode+":"+text);
+        } catch (exception) {
+          message(exception);
+        }
+
+        //inElem.text("") // remove
+      }
+      
+      function receivedReply(msg) {
+        function prepareOutput() {
+          var box = currentlyEvaluating[0]
+          var outElem = $('.output', box)
+          if (outElem.hasClass('overwrite')) {
+            outElem.removeClass('overwrite')
+            outElem.text("")
+          }
+        }
+        function putIntoOutput(msg) {
+          var box = currentlyEvaluating[0]
+          var outElem = $('.output', box)
+          outElem.text(outElem.text()+msg)
+        }
+        function gotoCurrentBox() {
+          var box = currentlyEvaluating[0]
+          var inElem = $('.input')
+          inElem.focus()
+        }
+        function gotoNextBox() {
+          var box = currentlyEvaluating[0]
+          var inElem = $('.input')
+          inElem.blur()
+          var next = box.next()
+          if (next.length)
+            $('.input',next).focus()
+          else
+            newBox()
+        }
+        function insertLineBreak() { // should handle both: return key and incomplete input (currently only #2)
+          var box = currentlyEvaluating[0]
+          var inElem = $('.input', box)
+          inElem.blur()
+          var text = inElem.text()
+          var len = text.length
+//          inElem.text(text+'\n\r') // why doesn't appendText work?
+          var xx = text.split('\n')
+          xx.push('')
+          inElem.text(xx.join('\n')) // why doesn't appendText work?
+          inElem.focus()
+          var selection = window.getSelection()
+          selection.collapseToEnd()
+  //          selection.removeAllRanges()
+  //          selection.collapse(inElem[0],len)
+  /*          var range = document.createRange()
+          range.setStart(inElem[0].firstChild,len+1)
+          range.setEnd(inElem[0].firstChild,len+5)
+  //          range.deleteContents()
+          selection.addRange(range)
+  //          selection.removeFromDocument()
+  */    }
+        function finishedWithCurrentBox() {
+          currentlyEvaluating.shift()
+          doExecNext()
+        }
+        
+        if (msg.indexOf('<done:error>') == 0) { // don't go to next if error
+          prepareOutput()
+          finishedWithCurrentBox()
+        } else if (msg.indexOf('<done:incomplete>') == 0) {
+          if (currentlyEvaluating.length == 1)
+            insertLineBreak()
+          else
+            putIntoOutput("<incomplete>")
+          finishedWithCurrentBox()
+        } else if (msg.indexOf('<done:success>') == 0) {
+          prepareOutput()
+          if (currentlyEvaluating.length == 1)
+            gotoNextBox()
+          finishedWithCurrentBox()
+        } else if (msg.indexOf('<js>') == 0) {
+          prepareOutput()
+          try {
+            putIntoOutput(""+eval(msg.substring(4)))
+          } catch (ex) {
+            message(ex)
+            putIntoOutput(ex)
+          }
+        } else if (msg.indexOf('<completion>') == 0) {
+          var lines = msg.split('\n')
+          var pos = lines[0].split(':')[1]
+          lines.shift()
+          $('#globalCompletions').text(lines.join("\n"))
+          // if hit explicitly insert common prefix
+          // if hit implicitly and at end of a line insert selected text of
+          //if (lines.length == 1) {
+            // if selection at end
+/*
+            if (lines.length == 1) {
+              var sel = window.getSelection()
+              var range = sel.getRangeAt(0)
+              var a = range.startOffset
+              var b = range.endOffset
+            } else
+              $('.completions',lastElem).show().text(lines.join("\n"))
+*/
+        } else {
+          prepareOutput()
+          putIntoOutput(msg)
+        }
+      }
+
+      // ------------ box creation / deletion
+      
+      function newBox(after) {
+        var box = $('<div class="box">'+
+        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input" contenteditable="true">'+settings.inputDefault+'</pre>'+
+        '  <pre class="completions"></pre>'+
+        '  <pre class="output"></pre>'+
+        '</div>')
+        
+        if (after)
+          after.after(box)
+        else
+          $('#replMain').append(box)
+        
+        box.keypress(function(event) {
+            if (event.keyCode == 13) { // enter -> run code
+              if (event.shiftKey ^ settings.editMultiLineDefault ^ true) {
+                submitExecBox($(this))
+                return false
+              }
+            } else if (event.keyCode == 0) { // ctrl+space (at least on Safari) -> explicit completion
+              if (event.ctrlKey) {
+                var mode = "complete:"+window.getSelection().getRangeAt(0).endOffset
+                send($(this), mode)
+                return false
+              }
+            }
+        })
+        box.keydown(function(event) {
+          //message("keyDown:"+event.keyCode)
+          if (!completionTimer && settings.showCompletions) {
+            completionTimer = setTimeout(function() {
+              completionTimer = null
+              var sel = window.getSelection()
+              if (sel.rangeCount) {
+                var mode = "complete:"+sel.getRangeAt(0).endOffset
+                send(box, mode)
+              } else $("#globalCompletions").text("")
+            },50)
+          }
+        })
+        
+        $('.input',box).blur(function(event) {
+            $('.completions',box).text("").hide()
+            $('#globalCompletions').text("")
+            $('.buttons',box).removeClass('shown')
+        })
+        $('.input',box).focus(function(event) {
+            $('.buttons',box).addClass('shown')
+        })
+        $('.add',box).click(function(event) {
+            newBox(box)
+        })
+        $('.remove',box).click(function(event) {
+            deleteBox(box)
+        })
+        $('.completions',box).hide()
+        $('.input',box).focus()
+        return box
+      }
+      
+      function deleteBox(box) {
+        curentlyEvaluating = [] // TODO: check box is contained
+
+        var next = box.next()
+        if (next.length) {
+          // TODO
+          // have no next? focus prev
+          // have no prev? create new
+        }
+        box.remove() // fade??
+      }
+
+      function removeAll() {
+        $('#replMain').children().remove()
+        curentlyEvaluating = []
+        newBox()
+      }
+
+      // ------------ local storage and session handling
+
+      function loadSession(key) {
+        var str = localStorage[key]
+        if (str) {
+          currentlyEvaluating = []
+          $('#replMain').children().remove()
+          var array = eval(str)
+          for (i in array) {
+            var box = newBox()
+            var rec = array[i]
+            $('.input',box).text(rec.input);
+            $('.output',box).text(rec.output);
+            message("loaded " + key)
+          }
+        } else
+          newBox()
+      }
+      
+      function loadState() {
+        
+        function setupFileRef(key,link) {
+          if ((!link) && (localStorage[key]))
+            return
+            
+          var fileList = $('#fileSys #fileList')
+          var file = $('<a class="fileRef" href="#">'+key+'</a><br/>')
+          fileList.append(file)
+          $(file).click(function(e) {
+            var key = $(this).text()
+            loadSession(key)
+            $('#newFileName').val(key)
+          })
+        }
+        
+        for (key in localStorage) {
+          if (key != 'lastSession' && key != 'settings')
+            setupFileRef(key,true)
+        }
+
+        $('#fileSysShowHide').click(function(e) {
+          $('#fileList').toggle()
+          $('#fileSysButtons').toggle()
+        })
+
+        $('#newFile').click(function(e) {
+          var key = $('#newFileName').val()
+          if (key == "") {
+            message("Please enter a name!")
+            return
+          }
+          setupFileRef(key,false)
+          saveSession(key)
+        })
+        
+        if (localStorage.settings) {
+          try { 
+            settings = eval(localStorage.settings)
+          } catch (ex) {
+            message("Error parsing settings: "+ex)
+          }
+        }
+        if (!settings.showSessions)
+          $('#fileList').hide()
+          $('#fileSysButtons').hide()
+        
+        loadSession('lastSession')
+      }
+
+      
+      function saveSession(key) {
+        var array = new Array
+        $('.box').each(function() {
+          var str = '{input:"'+ $('.input',this).text().replace(/"/g,'\\"') +
+          '", output:"' + $('.output',this).text().replace(/"/g,'\\"') + '"}'
+          array.push(str)
+        })
+        localStorage[key] = ('['+array.join(', ')+']').split("\n").join("\\n")
+        /*
+                var arrayIn = new Array
+                var arrayOut = new Array
+                $('.input').each(function () {
+                  arrayIn.push('input:"'+$(this).text()+'')
+                })
+                $('.output').each(function () {
+                  arrayOut.push('output:"'+$(this).text()+'')
+                })
+                for (var i in arrayIn) {
+                  alert(arrayIn+", "+arrayOut)
+                }
+        */        
+      }
+      function saveCurrentSession() {
+        saveSession('lastSession')
+        var array = new Array
+        for (key in settings) {
+          if (typeof(settings[key]) == 'string')
+            array.push(key + ": '" + settings[key] + "'")
+          else
+            array.push(key + ": " + settings[key])
+        }
+        localStorage.settings = "({"+array.join(",")+"})"
+      }
+
+      // ------------ load state
+      
+      loadState()
+
+      // ------------ global stuff
+      
+      $('#reconnect').click(function() {
+        if (socket)
+          socket.close()
+        connect()
+      });  
+
+      $('#execAll').click(function() {
+        saveCurrentSession() // debug way to force it
+        if (!currentlyEvaluating.length) {
+          $('.box').each(function () { submitExecBox($(this)) })
+        } else
+          message("Execution already in progress")
+      });
+
+      $('#removeAll').click(function() {
+        removeAll()
+      });  
+      
+      $('#showCompletions').click(function() {
+        settings.showCompletions = !settings.showCompletions
+        $('#showCompletions').text("Completion ("+settings.showCompletions+")")
+      });
+      $('#showCompletions').text("Completion ("+settings.showCompletions+")")
+
+      
+      // ------------ initial connect
+      
+      connect()
+
+      setInterval(function() { saveCurrentSession() }, 2000)
+      $(document).unload(function() { saveCurrentSession() })
+
+      // TODO:
+      // 'exec-all'
+      // better completion (ui front-end, and backend)
+      // fight glitches!!
+  
+  } // end onReady
+  
+});
+</script>
+
+<title>WebSockets Scala Client</title>  
+  
+</head>  
+<body>  
+    <div id="container">
+        <div id="fileSys">
+          <div id="fileSysShowHide">Sessions</div>
+          <div id="fileList"></div>
+          <div id="fileSysButtons"><input id="newFileName"/><button id="newFile">Save</button></div>
+        </div>
+          
+        <div id="statusBar">
+          <span id="status" class="off">&nbsp;</span>
+          <button id="reconnect">Reconnect</button>
+          <button id="execAll">Exec All</button>
+          <button id="removeAll">Remove All</button>
+          <button id="showCompletions">Completion</button>
+          <span id="msgLog"></span>
+        </div>
+
+        <hr/>
+        
+        <div id="replMain"></div>
+        <div id="globalCompletions"></div>
+        
+        
+    </div><!-- #container -->
+      
+  </body>
+</html>
