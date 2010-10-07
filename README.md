@@ -1,7 +1,7 @@
 Scala REPL HTML Interface
 =========================
 
-This project provides the Scala REPL with a GUI inspired by Mathematica worksheets. Commands can be edited and deleted, and new commands can be inserted anywhere. Whole worksheets can be re-evaluated with one click. Sessions can be saved and restored.
+This project provides a Scala REPL with a GUI inspired by Mathematica worksheets. Commands can be edited and deleted, and new commands can be inserted anywhere. Whole worksheets can be re-evaluated with one click. Sessions can be saved and restored.
 
 The frontend is just an HTML page that communicates with a backend servlet via web sockets. The backend servlet does the actual command execution. The servlet is not multi-user save; the program is meant to be run on a single computer.
 
@@ -10,7 +10,12 @@ The frontend is just an HTML page that communicates with a backend servlet via w
 How to Run it
 -------------
 
-Use SBT to run the REPL servlet within an embedded Jetty server:
+After downloading, use SBT to build
+
+      sbt update
+      sbt compile
+
+and then run the REPL servlet within an embedded Jetty server:
 
       sbt run
 
