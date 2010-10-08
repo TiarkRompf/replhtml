@@ -11,17 +11,15 @@ class Project(info: ProjectInfo) extends DefaultWebProject(info)
     val scala = "org.scala-lang" % "scala-library" % "2.8.0" % "compile"
     
     override def mainClass = Some("ch.epfl.lamp.replhtml.ReplMain")
-    
-    lazy val propRunClassPath = systemOptional[String]("replhtml.class.path", 
-      (runClasspath +++ Path.fromFile(buildScalaInstance.compilerJar) +++ 
-      Path.fromFile(buildScalaInstance.libraryJar)).absString)
 
-    override def jettyRunAction = {
-      System.setProperty("replhtml.class.path", propRunClassPath.get.get)
-      super.jettyRunAction
-    }
+    lazy val setupSysProps = task {
+      System.setProperty("replhtml.class.path", (runClasspath +++ Path.fromFile(buildScalaInstance.compilerJar) +++ 
+      Path.fromFile(buildScalaInstance.libraryJar)).absString)
+      None
+    } dependsOn(compile)
     
-    
+    override def runAction = task { args => super.runAction(args).dependsOn(setupSysProps) }
+
     // repositories
     val scalaToolsSnapshots = "Scala Tools Repository" at "http://nexus.scala-tools.org/content/repositories/snapshots/"
     val sonatypeNexusSnapshots = "Sonatype Nexus Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
