@@ -9,6 +9,8 @@ body {
 }
 .input {
   margin-left: 8ex;
+  -webkit-user-modify: read-write-plaintext-only;
+  -moz-user-modify: read-write-plaintext-only;
 }
 .output {
 }
@@ -301,7 +303,7 @@ $(document).ready(function() {
       
       function newBox(after) {
         var box = $('<div class="box">'+
-        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input" contenteditable="true">'+settings.inputDefault+'</pre>'+
+        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input">'+settings.inputDefault+'</pre>'+
         '  <pre class="completions"></pre>'+
         '  <pre class="output"></pre>'+
         '</div>')

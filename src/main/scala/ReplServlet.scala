@@ -79,8 +79,12 @@ class ReplServlet extends WebSocketServlet {
             if (ipos <= source.length) {
               val tokens = source.substring(0,ipos).split("""[\ \,\;\(\)\{\}]""") // could tokenize on client
               //println("try to complete: " + tokens.mkString(","))
-              val cmpl = completion.topLevelFor(Parsed.dotted(tokens.last, ipos) withVerbosity 4) // (?)
-              out.println("<completion>:"+ipos+"\n"+cmpl.mkString("\n"))
+              if (!tokens.isEmpty) {
+                val cmpl = completion.topLevelFor(Parsed.dotted(tokens.last, ipos) withVerbosity 4) // (?)
+                out.println("<completion>:"+ipos+"\n"+cmpl.mkString("\n"))
+              } else {
+                out.println("<completion>:"+ipos+"\n")
+              }
             } else {
               out.println("<completion>:"+ipos+"\n")
             }
