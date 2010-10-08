@@ -14,7 +14,7 @@ class ReplServlet extends WebSocketServlet {
 
   var classpath = System.getProperty("replhtml.class.path")
   assert(classpath ne null, "System property replhtml.class.path is not set. Repl needs a class path to operate.")
-  classpath += ":" + System.getProperty("replhtml.extra.class.path", "")
+  classpath += System.getProperty("path.separator") + System.getProperty("replhtml.extra.class.path", "")
   println(classpath)
   println("EXTRA:"+System.getProperty("replhtml.extra.class.path"))
 
