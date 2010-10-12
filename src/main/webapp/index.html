@@ -399,7 +399,7 @@ hljs.LANGUAGES.scala  = {
   defaultMode: {
     lexems: [hljs.UNDERSCORE_IDENT_RE],
     contains: ['javadoc', 'comment', 'string', 'class', 'number', 'annotation'],
-    keywords: { 'type': 1, 'yield': 1, 'lazy': 1, 'override': 1, 'def': 1, 'with': 1, 'val':1, 'var': 1, 'false': 1, 'true': 1, 'sealed': 1, 'abstract': 1, 'private': 1, 'trait': 1,  'object': 1, 'null': 1, 'if': 1, 'for': 1, 'while': 1, 'throw': 1, 'finally': 1, 'protected': 1, 'extends': 1, 'import': 1, 'final': 1, 'return': 1, 'else': 1, 'break': 1, 'new': 1, 'catch': 1, 'super': 1, 'class': 1, 'case': 1,'package': 1, 'default': 1, 'try': 1, 'this': 1, 'match': 1, 'continue': 1, 'throws': 1}
+    keywords: { 'type': 1, 'yield': 1, 'lazy': 1, 'implicit': 1, 'override': 1, 'def': 1, 'with': 1, 'val':1, 'var': 1, 'false': 1, 'true': 1, 'sealed': 1, 'abstract': 1, 'private': 1, 'trait': 1,  'object': 1, 'null': 1, 'if': 1, 'for': 1, 'while': 1, 'throw': 1, 'finally': 1, 'protected': 1, 'extends': 1, 'import': 1, 'final': 1, 'return': 1, 'else': 1, 'break': 1, 'new': 1, 'catch': 1, 'super': 1, 'class': 1, 'case': 1,'package': 1, 'default': 1, 'try': 1, 'this': 1, 'match': 1, 'continue': 1, 'throws': 1}
   },
   modes: [
     {
@@ -461,7 +461,7 @@ Intellij Idea-like styling (c) Vasily Polovnyov <vast@whiteants.net>
 styles/idea.css from the highlight.js distribution (except padding was removed from `pre code`)
 */
 
-pre code {
+pre {
   display: block;
   color: #000;
   background: #fff;
@@ -874,12 +874,12 @@ $(document).ready(function() {
       function highlight(input) {
           var result = hljs.highlight('scala', input.text()).value
           if (result) {
-            input.replaceWith('<pre class="input"><code class="scala">' + result + '</code></pre>')
+            input.html(result)
           }
       }
       function newBox(after) {
         var box = $('<div class="box">'+
-        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input"><code class="scala">'+settings.inputDefault+'</code></pre>'+
+        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input">'+settings.inputDefault+'</pre>'+
         '  <pre class="completions"></pre>'+
         '  <pre class="output"></pre>'+
         '</div>')
