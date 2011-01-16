@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<link rel="stylesheet" type="text/css" href="prettify/prettify.css"/>
+<script type="text/javascript" src="prettify/prettify.js"></script>
+<script type="text/javascript" src="prettify/lang-scala.js"></script>
+
 <style type="text/css">
 body {
   font-family: sans-serif;
@@ -99,6 +103,11 @@ body {
 #newFileName {
   border: 1px solid gray;
 }
+/* Prettify overrides */
+pre.prettyprint {
+    border: none;
+}
+
 </style>
 <script type="text/javascript">
 $(document).ready(function() {  
@@ -186,6 +195,8 @@ $(document).ready(function() {
             return
         }
         outElem.addClass('overwrite')
+
+
         //$('#replLog').append('scala> '+text+'\n')
 
         try {
@@ -209,7 +220,7 @@ $(document).ready(function() {
         function putIntoOutput(msg) {
           var box = currentlyEvaluating[0]
           var outElem = $('.output', box)
-          outElem.text(outElem.text()+msg)
+          outElem.html(prettyPrintOne(outElem.text()+msg, "scala"))
         }
         function gotoCurrentBox() {
           var box = currentlyEvaluating[0]
@@ -218,7 +229,7 @@ $(document).ready(function() {
         }
         function gotoNextBox() {
           var box = currentlyEvaluating[0]
-          var inElem = $('.input')
+          var inElem = $('.input', box)
           inElem.blur()
           var next = box.next()
           if (next.length)
@@ -303,9 +314,9 @@ $(document).ready(function() {
       
       function newBox(after) {
         var box = $('<div class="box">'+
-        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input">'+settings.inputDefault+'</pre>'+
+        '  <div class="runIn"><span class="prompt">scala&gt</span><span class="buttons"><span class="remove">-</span>&nbsp;<span class="add">+</span></span></div><pre class="input prettyprint lang-scala">'+settings.inputDefault+'</pre>'+
         '  <pre class="completions"></pre>'+
-        '  <pre class="output"></pre>'+
+        '  <pre class="output prettyprint lang-scala"></pre>'+
         '</div>')
         
         if (after)
@@ -345,8 +356,10 @@ $(document).ready(function() {
             $('.completions',box).text("").hide()
             $('#globalCompletions').text("")
             $('.buttons',box).removeClass('shown')
+            $(this).html(prettyPrintOne($(this).text(), "scala"));
         })
         $('.input',box).focus(function(event) {
+            $(this).html($(this).text());
             $('.buttons',box).addClass('shown')
         })
         $('.add',box).click(function(event) {
@@ -519,6 +532,8 @@ $(document).ready(function() {
 
       setInterval(function() { saveCurrentSession() }, 2000)
       $(document).unload(function() { saveCurrentSession() })
+
+      prettyPrint()
 
       // TODO:
       // 'exec-all'
