@@ -897,7 +897,7 @@ $(document).ready(function() {
               }
             } else if (event.keyCode == 0) { // ctrl+space (at least on Safari) -> explicit completion
               if (event.ctrlKey) {
-                var mode = "complete:"+window.getSelection().getRangeAt(0).endOffset
+                var mode = "complete@"+window.getSelection().getRangeAt(0).endOffset
                 send($(this), mode)
                 return false
               }
@@ -910,7 +910,7 @@ $(document).ready(function() {
               completionTimer = null
               var sel = window.getSelection()
               if (sel.rangeCount) {
-                var mode = "complete:"+sel.getRangeAt(0).endOffset
+                var mode = "complete@"+sel.getRangeAt(0).endOffset+"]"
                 send(box, mode)
               } else $("#globalCompletions").text("")
             },50)

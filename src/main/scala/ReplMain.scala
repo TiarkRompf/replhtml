@@ -7,10 +7,11 @@ object ReplMain {
     val sockets = collection.mutable.ListBuffer.empty[WebSocket]
     // TODO: WebSocketServer is deprecated in unfiltered 0.6.8
     WebSocketServer("/socket/repl", 8080) {
-      case Open(s) => sockets += s
-      case Message(s, Text(str)) =>
-        println(s"message: $str"); val resp = handle(str); println(s"Response: $resp"); sockets foreach (_.send(resp))
-      case Close(s) => sockets -= s
+      case Open(s)               => sockets += s
+      case Message(s, Text(str)) => println(s"message: $str")
+        val resp = interpret(str); println(s"Response: $resp")
+        sockets foreach (_.send(resp))
+      case Close(s)    => sockets -= s
       case Error(s, e) => println(s"error ${e.getMessage}")
     } run ()
   }
@@ -27,29 +28,20 @@ object ReplMain {
   // interpreter.bind("servlet", "ch.epfl.lamp.replhtml.ReplServlet", ReplServlet.this) }
   // interpreter.unleash()
 
-  def handle(data: String): String = {
-    val idx = data.indexOf(":")
-    val key = if (idx > 0) data.substring(0, idx) else ""
-    var source = if (idx >= 0) data.substring(idx + 1) else data
+  def interpret(data: String): String = {
+    // TODO: use json
+    val Complete = """complete@(\d*)""".r
+    object I { def unapply(x: String): Option[Int] = scala.util.Try { x.toInt } toOption }
+    data.split(":", 2) match {
+      case Array(Complete(I(pos)), source) =>
+        "<completion>:" + pos + "\n" + {
+          lazy val tokens = source.substring(0, pos).split("""[\ \,\;\(\)\{\}]""") // could tokenize on client
+          if (pos <= source.length && tokens.nonEmpty)
+            completion.topLevelFor(Parsed.dotted(tokens.last, pos) withVerbosity 4).mkString("\n")
+          else ""
+        }
 
-    key match {
-      case "complete" =>
-        val idx = source.indexOf(":")
-        val ipos = Integer.parseInt(source.substring(0, idx))
-        source = source.substring(idx + 1)
-
-        val res = if (ipos <= source.length) {
-          val tokens = source.substring(0, ipos).split("""[\ \,\;\(\)\{\}]""") // could tokenize on client
-          println("try to complete: " + tokens.mkString(","))
-          if (tokens.nonEmpty) {
-            val cmpl = completion.topLevelFor(Parsed.dotted(tokens.last, ipos) withVerbosity 4) // (?)
-            "<completion>:" + ipos + "\n" + cmpl.mkString("\n")
-          } else "<completion>:" + ipos + "\n"
-        } else "<completion>:" + ipos + "\n"
-        println("res: " + res)
-        res
-
-      case _ =>
+      case Array("run", source) =>
         util.stringFromStream { ostream =>
           Console.withOut(ostream) {
             interpreter.interpret(source) match {
