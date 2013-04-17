@@ -1,6 +1,7 @@
 package ch.epfl.lamp.replhtml
 
 import unfiltered.netty.websockets._
+import scala.util.matching.Regex
 
 object ReplMain {
   def main(args: Array[String]) {
@@ -30,10 +31,12 @@ object ReplMain {
 
   def interpret(data: String): String = {
     // TODO: use json
-    val Complete = """complete@(\d*)""".r
+    implicit class RContext(sc: StringContext) {
+      def rx = new Regex(sc.parts.mkString(""), sc.parts.tail.map(_ => "x"): _*)
+    }
     object I { def unapply(x: String): Option[Int] = scala.util.Try { x.toInt } toOption }
     data.split(":", 2) match {
-      case Array(Complete(I(pos)), source) =>
+      case Array(rx"""complete@(\d*)${I(pos)}""", source) =>
         "<completion>:" + pos + "\n" + {
           lazy val tokens = source.substring(0, pos).split("""[\ \,\;\(\)\{\}]""") // could tokenize on client
           if (pos <= source.length && tokens.nonEmpty)
