@@ -1,30 +1,59 @@
 package ch.epfl.lamp.replhtml
 
-//import javax.servlet.http._
-import org.eclipse.jetty.server.Server
-import org.eclipse.jetty.servlet.ServletContextHandler
-import org.eclipse.jetty.servlet.ServletHolder
-import org.eclipse.jetty.servlet.DefaultServlet
+import unfiltered.netty.websockets._
+import scala.util.matching.Regex
 
 object ReplMain {
   def main(args: Array[String]) {
-    val server = new Server(8080)
+    val sockets = collection.mutable.ListBuffer.empty[WebSocket]
+    // TODO: WebSocketServer is deprecated in unfiltered 0.6.8
+    WebSocketServer("/socket/repl", 8080) {
+      case Open(s)               => sockets += s
+      case Message(s, Text(str)) => println(s"message: $str")
+        val resp = interpret(str); println(s"Response: $resp")
+        sockets foreach (_.send(resp))
+      case Close(s)    => sockets -= s
+      case Error(s, e) => println(s"error ${e.getMessage}")
+    } run ()
+  }
 
-    val context = new ServletContextHandler(ServletContextHandler.SESSIONS)
-    context.setContextPath("/")
-    server.setHandler(context)
+  import scala.tools.nsc._
+  import scala.tools.nsc.interpreter._
 
-    context.addServlet(new ServletHolder(new ReplServlet()),"/socket/*")
-    context.addServlet(new ServletHolder(new DefaultServlet()),"/*")
+  val cmd = new CommandLine(Nil, println)
+  import cmd.settings
+  settings.classpath.value = System.getProperty("replhtml.class.path")
 
-    server.start()
-    println(">>> embedded jetty server started. press any key to stop.")
-    while (System.in.available() == 0) {
-      Thread.sleep(1500)
+  val interpreter = new IMain(settings)
+  val completion = new JLineCompletion(interpreter)
+  // interpreter.bind("servlet", "ch.epfl.lamp.replhtml.ReplServlet", ReplServlet.this) }
+  // interpreter.unleash()
+
+  def interpret(data: String): String = {
+    // TODO: use json
+    implicit class RContext(sc: StringContext) {
+      def rx = new Regex(sc.parts.mkString(""), sc.parts.tail.map(_ => "x"): _*)
     }
-    System.in.read()
-    println(">>> stopping...")
-    server.stop()
-    server.join()
+    object I { def unapply(x: String): Option[Int] = scala.util.Try { x.toInt } toOption }
+    data.split(":", 2) match {
+      case Array(rx"""complete@(\d*)${I(pos)}""", source) =>
+        "<completion>:" + pos + "\n" + {
+          lazy val tokens = source.substring(0, pos).split("""[\ \,\;\(\)\{\}]""") // could tokenize on client
+          if (pos <= source.length && tokens.nonEmpty)
+            completion.topLevelFor(Parsed.dotted(tokens.last, pos) withVerbosity 4).mkString("\n")
+          else ""
+        }
+
+      case Array("run", source) =>
+        util.stringFromStream { ostream =>
+          Console.withOut(ostream) {
+            interpreter.interpret(source) match {
+              case IR.Error => println("<done:error>")
+              case IR.Success => println("<done:success>")
+              case IR.Incomplete => println("<done:incomplete>")
+            }
+          }
+        }
+    }
   }
 }
